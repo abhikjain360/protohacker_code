@@ -29,7 +29,7 @@ impl StreamHandler {
     fn with_stream(stream: TcpStream, addr: SocketAddr) -> Self {
         Self {
             stream,
-            buf: vec![0; 4096],
+            buf: vec![0; 1024],
             to_write: 0,
             addr,
         }
@@ -39,13 +39,11 @@ impl StreamHandler {
     fn try_rw(&mut self, event: &Event) -> anyhow::Result<bool> {
         let mut close = false;
 
-        if event.is_writable() {
-            self.try_write()?;
-        }
-
         if event.is_readable() {
             close = self.try_read()?;
         }
+
+        self.try_write()?;
 
         Ok(close)
     }
@@ -106,13 +104,11 @@ impl StreamHandler {
         }
 
         info!("addr = {addr:?} to_write = {to_write}");
-        if let Err(e) = stream.write_all(&buf[..*to_write]) {
-            if e.kind() != ErrorKind::WouldBlock {
-                return Err(e.into());
-            }
+        match stream.write_all(&buf[..*to_write]) {
+            Ok(()) => *to_write = 0,
+            Err(e) if e.kind() != ErrorKind::WouldBlock => return Err(e.into()),
+            _ => {}
         }
-
-        *to_write = 0;
 
         Ok(())
     }
@@ -130,11 +126,12 @@ fn main() -> anyhow::Result<()> {
     let poll = &mut Poll::new()?;
     let events = &mut Events::with_capacity(1024);
 
-    let stream_interests = Interest::READABLE | Interest::WRITABLE;
-
     let server = &mut TcpListener::bind(socke_addr)?;
-    poll.registry()
-        .register(server, SERVER_TOKEN, stream_interests)?;
+    poll.registry().register(
+        server,
+        SERVER_TOKEN,
+        Interest::READABLE | Interest::WRITABLE,
+    )?;
 
     let connections = &mut HashMap::with_capacity_and_hasher(1024, RandomState::new());
     let mut token_index = 1;
@@ -158,7 +155,7 @@ fn main() -> anyhow::Result<()> {
                     token_index += 1;
 
                     poll.registry()
-                        .register(&mut stream, token, stream_interests)?;
+                        .register(&mut stream, token, Interest::READABLE)?;
                     connections.insert(token, StreamHandler::with_stream(stream, addr));
 
                     info!("accepted connection from {addr}");
