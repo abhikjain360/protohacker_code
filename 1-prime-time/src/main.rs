@@ -29,20 +29,19 @@ impl ReadHandler {
             closed = n == 0;
             read_bytes += n;
 
-            let res = std::str::from_utf8(&buf[..read_bytes]);
-            match serde_json::from_slice::<WebInput>(&buf[..read_bytes]) {
-                Ok(input) if !input.is_valid() => {
-                    if let Ok(s) = res {
-                        debug!(input = s);
-                    }
+            let s = match std::str::from_utf8(&buf[..read_bytes]) {
+                Ok(v) => v,
+                Err(_) => break None,
+            };
 
+            match serde_json::from_str::<WebInput>(s) {
+                Ok(input) if !input.is_valid() => {
+                    debug!(input = s);
                     warn!("invalid input method \"{}\"", input.method);
                     break None;
                 }
                 Ok(input) => {
-                    if let Ok(s) = res {
-                        debug!(input = s);
-                    }
+                    debug!(input = s);
 
                     let rounded = input.number.round();
                     if rounded != input.number {
@@ -53,16 +52,11 @@ impl ReadHandler {
                 }
 
                 Err(_) if closed => {
-                    if let Ok(s) = res {
-                        debug!(input = s);
-                    }
-
+                    debug!(input = s);
                     break None;
                 }
                 Err(e) if buf[read_bytes - 1] == b'\n' => {
-                    if let Ok(s) = res {
-                        debug!(input = s);
-                    }
+                    debug!(input = s);
 
                     warn!("serde_json: {e}");
                     break None;
