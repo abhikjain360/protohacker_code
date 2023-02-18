@@ -113,7 +113,7 @@ fn main() -> anyhow::Result<()> {
     let socke_addr = args.next().expect("no port number provided").parse()?;
 
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(tracing::Level::WARN)
         .pretty()
         .init();
 
