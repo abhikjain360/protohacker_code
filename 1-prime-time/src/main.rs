@@ -53,9 +53,17 @@ impl ReadHandler {
                 }
 
                 Err(_) if closed => {
+                    if let Ok(s) = res {
+                        debug!(input = s);
+                    }
+
                     break None;
                 }
                 Err(e) if buf[read_bytes - 1] == b'\n' => {
+                    if let Ok(s) = res {
+                        debug!(input = s);
+                    }
+
                     warn!("serde_json: {e}");
                     break None;
                 }
