@@ -6,7 +6,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 struct ReadHandler {
     addr: SocketAddr,
@@ -29,12 +29,21 @@ impl ReadHandler {
             closed = n == 0;
             read_bytes += n;
 
+            let res = std::str::from_utf8(&buf[..read_bytes]);
             match serde_json::from_slice::<WebInput>(&buf[..read_bytes]) {
                 Ok(input) if !input.is_valid() => {
+                    if let Ok(s) = res {
+                        debug!(input = s);
+                    }
+
                     warn!("invalid input method \"{}\"", input.method);
                     break None;
                 }
                 Ok(input) => {
+                    if let Ok(s) = res {
+                        debug!(input = s);
+                    }
+
                     let rounded = input.number.round();
                     if rounded != input.number {
                         break Some(-1);
