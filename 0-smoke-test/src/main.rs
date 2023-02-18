@@ -1,6 +1,7 @@
 use std::{
     io::{ErrorKind, Read, Write},
     time::Duration,
+    env,
 };
 
 use ahash::RandomState;
@@ -102,6 +103,10 @@ impl StreamHandler {
 }
 
 fn main() -> anyhow::Result<()> {
+    let mut args = env::args();
+    args.next().expect("no binary name provided");
+    let socke_addr = args.next().expect("no port number provided").parse()?;
+
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .pretty()
@@ -112,7 +117,7 @@ fn main() -> anyhow::Result<()> {
 
     let stream_interests = Interest::READABLE | Interest::WRITABLE;
 
-    let server = &mut TcpListener::bind(([127, 0, 0, 1], 3000).into())?;
+    let server = &mut TcpListener::bind(socke_addr)?;
     poll.registry()
         .register(server, SERVER_TOKEN, stream_interests)?;
 
