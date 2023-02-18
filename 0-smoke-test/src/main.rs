@@ -74,8 +74,8 @@ impl StreamHandler {
                 Ok(n) => bytes_read += n,
             }
 
-            if *to_write == buf.len() {
-                buf.resize(*to_write + 1024, 0);
+            if *to_write + bytes_read == buf.len() {
+                buf.resize(*to_write + bytes_read + 1024, 0);
             }
         }
 
