@@ -61,7 +61,7 @@ impl StreamHandler {
 
         // read until we are blocked or an error occurs
         loop {
-            match stream.read(&mut buf[*to_write..]) {
+            match stream.read(&mut buf[*to_write + bytes_read..]) {
                 Err(e) => match e.kind() {
                     ErrorKind::Interrupted => continue,
                     ErrorKind::WouldBlock => break,
