@@ -1,0 +1,18 @@
+[package]
+name = "prime-time"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ahash = "0.8.3"
+anyhow = { version = "1.0.69", features = ["backtrace"] }
+futures = "0.3.26"
+indexmap = { version = "1.9.2", features = ["std"] }
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = { version = "1.0.93", features = ["alloc", "indexmap"] }
+tap = "1.0.1"
+tokio = { version = "1.25.0", features = ["io-util", "rt-multi-thread", "net", "macros", "parking_lot"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["once_cell", "parking_lot", "time", "env-filter"] }
