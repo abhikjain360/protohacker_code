@@ -40,7 +40,14 @@ impl ReadHandler {
                     warn!("invalid input method \"{}\"", input.method);
                     break None;
                 }
-                Ok(input) => break Some(input),
+                Ok(input) => {
+                    let rounded = input.number.round();
+                    if rounded != input.number {
+                        break Some(-1);
+                    } else {
+                        break Some(rounded as i64);
+                    }
+                }
 
                 Err(_) if closed => {
                     break None;
@@ -69,7 +76,7 @@ impl ReadHandler {
 struct WriteHandler {
     addr: SocketAddr,
     stream: TcpStream,
-    input: Option<WebInput>,
+    input: Option<i64>,
     closed: bool,
 }
 
@@ -83,7 +90,7 @@ impl WriteHandler {
         } = self;
 
         if let Some(input) = input {
-            let output = &WebOutput::new(checker.lock().unwrap().is_prime(input.number));
+            let output = &WebOutput::new(checker.lock().unwrap().is_prime(input));
             let mut output_str = serde_json::to_string(output)?;
             output_str.push('\n');
 
@@ -103,7 +110,7 @@ impl WriteHandler {
 #[derive(Deserialize)]
 struct WebInput {
     method: String,
-    number: u64,
+    number: f64,
 }
 
 impl WebInput {
@@ -128,8 +135,8 @@ impl WebOutput {
 }
 
 struct PrimesList {
-    primes: IndexSet<u64, RandomState>,
-    last_checked: u64,
+    primes: IndexSet<i64, RandomState>,
+    last_checked: i64,
 }
 
 impl PrimesList {
@@ -141,14 +148,14 @@ impl PrimesList {
         }
     }
 
-    fn is_prime(&mut self, val: u64) -> bool {
+    fn is_prime(&mut self, val: i64) -> bool {
         if val >= self.last_checked {
             self.check_upto(val);
         }
         self.primes.contains(&val)
     }
 
-    fn check_upto(&mut self, val: u64) {
+    fn check_upto(&mut self, val: i64) {
         if val < 2 {
             return;
         }
