@@ -1,12 +1,6 @@
-use std::{
-    env,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::{env, net::SocketAddr};
 
-use ahash::RandomState;
 use futures::{stream::FuturesUnordered, StreamExt};
-use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -81,7 +75,7 @@ struct WriteHandler {
 }
 
 impl WriteHandler {
-    async fn try_write(self, checker: Arc<Mutex<PrimesList>>) -> anyhow::Result<ReadHandler> {
+    async fn try_write(self) -> anyhow::Result<ReadHandler> {
         let WriteHandler {
             mut stream,
             input,
@@ -90,7 +84,7 @@ impl WriteHandler {
         } = self;
 
         if let Some(input) = input {
-            let output = &WebOutput::new(checker.lock().unwrap().is_prime(input));
+            let output = &WebOutput::new(check_prime(input));
             let mut output_str = serde_json::to_string(output)?;
             output_str.push('\n');
 
@@ -134,43 +128,18 @@ impl WebOutput {
     }
 }
 
-struct PrimesList {
-    primes: IndexSet<i64, RandomState>,
-    last_checked: i64,
-}
+fn check_prime(val: i64) -> bool {
+    if val < 2 {
+        return false;
+    };
 
-impl PrimesList {
-    fn new() -> Self {
-        let primes = IndexSet::with_hasher(RandomState::new());
-        Self {
-            primes,
-            last_checked: 2,
+    for x in 2..(val as f64).sqrt().ceil() as i64 {
+        if val % x == 0 {
+            return false;
         }
     }
 
-    fn is_prime(&mut self, val: i64) -> bool {
-        if val >= self.last_checked {
-            self.check_upto(val);
-        }
-        self.primes.contains(&val)
-    }
-
-    fn check_upto(&mut self, val: i64) {
-        if val < 2 {
-            return;
-        }
-
-        info!("PrimesList: checking upto {val}");
-
-        for x in self.last_checked..=val {
-            if self.primes.iter().copied().any(|prime| x % prime == 0) {
-                continue;
-            }
-            self.primes.insert(x);
-        }
-
-        self.last_checked = val;
-    }
+    return true;
 }
 
 #[tokio::main]
@@ -186,8 +155,6 @@ async fn main() -> anyhow::Result<()> {
 
     let read_futures = &mut FuturesUnordered::new();
     let write_futures = &mut FuturesUnordered::new();
-
-    let primes_list = Arc::new(Mutex::new(PrimesList::new()));
 
     loop {
         let new_conn_fut = listener.accept();
@@ -214,7 +181,7 @@ async fn main() -> anyhow::Result<()> {
                 if handler.closed {
                     info!("connection closed with {}", handler.addr);
                 } else {
-                    write_futures.push(handler.try_write(primes_list.clone()));
+                    write_futures.push(handler.try_write());
                 }
             },
             opt = conn_write_fut => {
