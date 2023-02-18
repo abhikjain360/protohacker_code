@@ -1,7 +1,8 @@
 use std::{
-    io::{ErrorKind, Read, Write},
-    time::Duration,
     env,
+    io::{ErrorKind, Read, Write},
+    net::SocketAddr,
+    time::Duration,
 };
 
 use ahash::RandomState;
@@ -19,16 +20,18 @@ type HashMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 
 struct StreamHandler {
     stream: TcpStream,
+    addr: SocketAddr,
     buf: Vec<u8>,
     to_write: usize,
 }
 
 impl StreamHandler {
-    fn with_stream(stream: TcpStream) -> Self {
+    fn with_stream(stream: TcpStream, addr: SocketAddr) -> Self {
         Self {
             stream,
             buf: vec![0; 4096],
             to_write: 0,
+            addr,
         }
     }
 
@@ -51,6 +54,7 @@ impl StreamHandler {
             stream,
             buf,
             to_write,
+            ..
         } = self;
         let mut bytes_read = 0;
         let mut close = false;
@@ -84,6 +88,7 @@ impl StreamHandler {
             stream,
             buf,
             to_write,
+            ..
         } = self;
         loop {
             match stream.write_all(&buf[..*to_write]) {
@@ -91,7 +96,7 @@ impl StreamHandler {
                     ErrorKind::WouldBlock => break,
                     ErrorKind::Interrupted => continue,
                     _ => return Err(e.into()),
-                }
+                },
                 Ok(_) => break,
             }
         }
@@ -144,7 +149,7 @@ fn main() -> anyhow::Result<()> {
 
                     poll.registry()
                         .register(&mut stream, token, stream_interests)?;
-                    connections.insert(token, StreamHandler::with_stream(stream));
+                    connections.insert(token, StreamHandler::with_stream(stream, addr));
 
                     info!("accepted connection from {addr}");
                 },
@@ -156,6 +161,7 @@ fn main() -> anyhow::Result<()> {
                     };
                     if handler.try_rw(event)? {
                         poll.registry().deregister(&mut handler.stream)?;
+                        info!("disconnected from {}", handler.addr);
                         connections.remove(&token);
                     }
                 }
