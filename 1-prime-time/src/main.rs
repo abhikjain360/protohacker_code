@@ -129,7 +129,7 @@ impl WebOutput {
 }
 
 fn check_prime(val: i64) -> bool {
-    if val < 1 {
+    if val < 2 {
         return false;
     };
 
