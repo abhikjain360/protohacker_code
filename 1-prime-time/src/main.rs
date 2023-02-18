@@ -160,6 +160,8 @@ impl PrimesList {
             return;
         }
 
+        info!("PrimesList: checking upto {val}");
+
         for x in self.last_checked..=val {
             if self.primes.iter().copied().any(|prime| x % prime == 0) {
                 continue;
