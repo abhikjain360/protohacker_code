@@ -6,7 +6,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, info, warn, Level};
 
 struct ReadHandler {
     addr: SocketAddr,
@@ -159,7 +159,9 @@ fn check_prime(val: i64) -> bool {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        .with_max_level(Level::DEBUG)
+        .init();
 
     let mut args = env::args();
     args.next().expect("no binary name");
