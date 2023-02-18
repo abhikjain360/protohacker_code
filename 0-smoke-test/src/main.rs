@@ -80,6 +80,10 @@ impl StreamHandler {
         }
 
         *to_write += bytes_read;
+        if *to_write == buf.len() {
+            buf.resize(*to_write + 1024, 0);
+        }
+
         Ok(close || bytes_read == 0)
     }
 
