@@ -11,7 +11,7 @@ use mio::{
     net::{TcpListener, TcpStream},
     Events, Interest, Poll, Token,
 };
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 
 const SERVER_TOKEN: Token = Token(0);
 const TIMEOUT: Duration = Duration::from_millis(100);
@@ -35,20 +35,22 @@ impl StreamHandler {
         }
     }
 
+    #[instrument(skip(self, event))]
     fn try_rw(&mut self, event: &Event) -> anyhow::Result<bool> {
         let mut close = false;
-
-        if event.is_readable() {
-            close = self.try_read()?;
-        }
 
         if event.is_writable() {
             self.try_write()?;
         }
 
+        if event.is_readable() {
+            close = self.try_read()?;
+        }
+
         Ok(close)
     }
 
+    #[instrument(skip(self))]
     fn try_read(&mut self) -> anyhow::Result<bool> {
         let StreamHandler {
             stream,
@@ -56,52 +58,57 @@ impl StreamHandler {
             to_write,
             ..
         } = self;
-        let mut bytes_read = 0;
+        let old_len = *to_write;
         let mut close = false;
 
         // read until we are blocked or an error occurs
         loop {
-            match stream.read(&mut buf[*to_write + bytes_read..]) {
+            match stream.read(&mut buf[*to_write..]) {
                 Err(e) => match e.kind() {
                     ErrorKind::Interrupted => continue,
                     ErrorKind::WouldBlock => break,
                     _ => return Err(e.into()),
                 },
-                Ok(0) => {
-                    close = true;
-                    break;
+
+                Ok(n) => {
+                    *to_write += n;
+
+                    info!(to_write = to_write, n = n, bl = buf.len());
+
+                    if *to_write == buf.len() {
+                        buf.resize(*to_write + 1024, 0);
+                        info!("resized bl = {}", buf.len());
+                        continue;
+                    }
+
+                    if n == 0 {
+                        close = true;
+                        break;
+                    }
                 }
-                Ok(n) => bytes_read += n,
-            }
-
-            if *to_write + bytes_read == buf.len() {
-                buf.resize(*to_write + bytes_read + 1024, 0);
             }
         }
 
-        *to_write += bytes_read;
-        if *to_write == buf.len() {
-            buf.resize(*to_write + 1024, 0);
-        }
-
-        Ok(close || bytes_read == 0)
+        Ok(close || *to_write == old_len)
     }
 
+    #[instrument(skip(self))]
     fn try_write(&mut self) -> anyhow::Result<()> {
         let StreamHandler {
             stream,
             buf,
             to_write,
-            ..
+            addr,
         } = self;
-        loop {
-            match stream.write_all(&buf[..*to_write]) {
-                Err(e) => match e.kind() {
-                    ErrorKind::WouldBlock => break,
-                    ErrorKind::Interrupted => continue,
-                    _ => return Err(e.into()),
-                },
-                Ok(_) => break,
+
+        if *to_write == 0 {
+            return Ok(());
+        }
+
+        info!("addr = {addr:?} to_write = {to_write}");
+        if let Err(e) = stream.write_all(&buf[..*to_write]) {
+            if e.kind() != ErrorKind::WouldBlock {
+                return Err(e.into());
             }
         }
 
@@ -117,8 +124,7 @@ fn main() -> anyhow::Result<()> {
     let socke_addr = args.next().expect("no port number provided").parse()?;
 
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::WARN)
-        .pretty()
+        .with_max_level(tracing::Level::INFO)
         .init();
 
     let poll = &mut Poll::new()?;
