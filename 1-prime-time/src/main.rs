@@ -135,7 +135,7 @@ fn check_prime(val: i64) -> bool {
 
     info!("checking for {val}");
 
-    for x in 2..(val as f64).sqrt().ceil() as i64 {
+    for x in 2..=(val as f64).sqrt().ceil() as i64 {
         if val % x == 0 {
             return false;
         }
