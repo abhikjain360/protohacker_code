@@ -13,6 +13,6 @@ indexmap = { version = "1.9.2", features = ["std"] }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["alloc", "indexmap"] }
 tap = "1.0.1"
-tokio = { version = "1.25.0", features = ["io-util", "rt-multi-thread", "net", "macros", "parking_lot"] }
+tokio = { version = "1.25.0", features = ["io-util", "rt-multi-thread", "net", "macros", "parking_lot", "time"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["once_cell", "parking_lot", "time", "env-filter"] }
