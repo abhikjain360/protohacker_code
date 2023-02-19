@@ -11,7 +11,7 @@ macro_rules! allow_eof {
     ($expr:expr) => {
         match $expr {
             Ok(v) => v,
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
             Err(e) => return Err(e.into()),
         }
     };
