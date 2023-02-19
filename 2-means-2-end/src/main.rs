@@ -58,9 +58,8 @@ async fn handle_query(stream: &mut TcpStream, tree: &sled::Tree) -> anyhow::Resu
                 )
             })
         })?;
-    let avg = ((sum as f64) / (len as f64)).ceil() as i64;
 
-    stream.write_i32(avg as i32).await?;
+    stream.write_i32((sum / len) as i32).await?;
 
     Ok(())
 }
