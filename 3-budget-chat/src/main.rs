@@ -9,8 +9,8 @@ use tokio::{
 };
 use tracing::{error, info};
 
-pub type Message = Arc<String>;
 pub type UserName = Arc<String>;
+pub type MsgConent = Arc<String>;
 pub type UsersList = Arc<RwLock<HashSet<Arc<String>>>>;
 
 const WELCOME_MESSAGE: &[u8] = b"* Welcome to budgetchat! What shall I call you?\n";
@@ -31,12 +31,24 @@ macro_rules! write_and_exit {
     };
 }
 
-fn create_arrival_message(name: &str) -> Message {
-    Message::new(format!("* {name} has entered the room\n"))
+#[derive(Debug, Clone)]
+pub struct Msg {
+    from: UserName,
+    content: MsgConent,
 }
 
-fn create_departure_message(name: &str) -> Message {
-    Message::new(format!("* {name} has left the room\n"))
+fn create_arrival_message(from: UserName) -> Msg {
+    Msg {
+        content: MsgConent::new(format!("* {from} has entered the room\n")),
+        from,
+    }
+}
+
+fn create_departure_message(from: UserName) -> Msg {
+    Msg {
+        content: MsgConent::new(format!("* {from} has left the room\n")),
+        from,
+    }
 }
 
 fn create_current_users_message(users: &[UserName]) -> String {
@@ -58,7 +70,7 @@ fn create_current_users_message(users: &[UserName]) -> String {
 async fn handle_stream(
     mut stream: TcpStream,
     addr: SocketAddr,
-    tx: broadcast::Sender<Message>,
+    tx: broadcast::Sender<Msg>,
     users: UsersList,
 ) -> anyhow::Result<()> {
     let (reader, mut writer) = stream.split();
@@ -97,8 +109,8 @@ async fn handle_stream(
 
     {
         let lock = &mut users.write().await;
-        let arrival_message = create_arrival_message(&name);
-        tx.send(arrival_message.clone())?;
+        let arrival_message = create_arrival_message(name.clone());
+        tx.send(arrival_message)?;
         lock.insert(name.clone());
     }
 
@@ -118,11 +130,13 @@ async fn handle_stream(
                     Some(msg) =>  Arc::new(format!("[{name}]: {}\n", msg.trim())),
                     None => break,
                 };
-                tx.send(msg)?;
+                tx.send(Msg { from: name.clone() , content: msg })?;
             }
             res_msg = rx.recv() => {
                 let msg = res_msg?;
-                writer.write_all(msg.as_bytes()).await?;
+                if msg.from != name {
+                    writer.write_all(msg.content.as_bytes()).await?;
+                }
             }
         }
     }
@@ -131,7 +145,7 @@ async fn handle_stream(
 
     {
         let lock = &mut users.write().await;
-        let departure_message = create_departure_message(&name);
+        let departure_message = create_departure_message(name.clone());
         tx.send(departure_message.clone())?;
         lock.remove(&name);
     }
