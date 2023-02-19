@@ -1,7 +1,9 @@
-use std::{env, net::SocketAddr};
+use std::{collections::HashMap, env, net::SocketAddr};
 
 use tokio::net::UdpSocket;
 use tracing::info;
+
+const EMPTY: &'static Vec<u8> = &Vec::new();
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -12,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
     let socket = UdpSocket::bind(addr).await?;
     let buf = &mut vec![0; 1000];
 
-    let db = sled::open("db")?;
+    let mut db = HashMap::new();
 
     loop {
         let (bytes_read, addr) = socket.recv_from(buf).await?;
@@ -23,7 +25,11 @@ async fn main() -> anyhow::Result<()> {
         info!("addr = {addr}, key = {key:?}");
 
         if key == b"version" {
-            socket.send_to(b"version=Abhik's attempt at Protohack Q4: v1.1", addr).await?;
+            if data.next().is_none() {
+                socket
+                    .send_to(b"version=Abhik's attempt at Protohack Q4: v1.1", addr)
+                    .await?;
+            }
             continue;
         }
 
@@ -31,18 +37,18 @@ async fn main() -> anyhow::Result<()> {
             None => {
                 info!("query");
 
-                let value = db.get(key)?.unwrap_or(b"".into());
+                let value = db.get(key).unwrap_or(EMPTY);
 
                 buf[bytes_read] = b'=';
                 let start = bytes_read + 1;
                 let end = start + value.len();
-                buf[start..end].copy_from_slice(&value);
+                buf[start..end].copy_from_slice(value);
 
                 socket.send_to(&buf[..end], addr).await?;
             }
             Some(value) => {
                 info!("insert");
-                db.insert(key, value)?;
+                db.insert(Vec::from(key), Vec::from(value));
             }
         }
     }
