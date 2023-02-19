@@ -1,6 +1,7 @@
 use std::{env, net::SocketAddr};
 
 use tokio::net::UdpSocket;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,6 +20,8 @@ async fn main() -> anyhow::Result<()> {
 
         let key = data.next().expect("there should atleast be an empty slice");
 
+        info!("addr = {addr}, key = {key:?}");
+
         if key == b"version" {
             socket.send_to(b"version=Abhik's attempt at Protohack Q4: v1.1", addr).await?;
             continue;
@@ -26,6 +29,8 @@ async fn main() -> anyhow::Result<()> {
 
         match data.next() {
             None => {
+                info!("query");
+
                 let value = db.get(key)?.unwrap_or(b"".into());
 
                 buf[bytes_read] = b'=';
@@ -36,6 +41,7 @@ async fn main() -> anyhow::Result<()> {
                 socket.send_to(&buf[..end], addr).await?;
             }
             Some(value) => {
+                info!("insert");
                 db.insert(key, value)?;
             }
         }
