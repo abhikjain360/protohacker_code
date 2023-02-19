@@ -127,7 +127,7 @@ async fn handle_stream(
         tokio::select! {
             res_msg_opt = lines.next_line() => {
                 let msg = match res_msg_opt? {
-                    Some(msg) =>  Arc::new(format!("[{name}]: {}\n", msg.trim())),
+                    Some(msg) =>  Arc::new(format!("[{name}] {}\n", msg.trim())),
                     None => break,
                 };
                 tx.send(Msg { from: name.clone() , content: msg })?;
