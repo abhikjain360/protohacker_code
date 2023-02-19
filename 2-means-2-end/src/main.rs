@@ -48,6 +48,11 @@ async fn handle_query(stream: &mut TcpStream, tree: &BTreeMap<i32, i64>) -> anyh
     let start = stream.read_i32().await?;
     let end = stream.read_i32().await?;
 
+    if start > end {
+        stream.write_i32(0).await?;
+        return Ok(());
+    }
+
     let (len, sum) = tree
         .range(start..=end)
         .fold((0, 0), |(len, sum), (_, &price)| (len + 1, sum + price));
