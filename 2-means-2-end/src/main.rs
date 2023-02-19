@@ -17,7 +17,11 @@ macro_rules! allow_eof {
     };
 }
 
-async fn handle_stream(mut stream: TcpStream, addr: SocketAddr, tree: sled::Tree) -> anyhow::Result<()> {
+async fn handle_stream(
+    mut stream: TcpStream,
+    addr: SocketAddr,
+    tree: sled::Tree,
+) -> anyhow::Result<()> {
     loop {
         match allow_eof!(stream.read_u8().await) {
             b'I' => handle_insert(&mut stream, &tree).await?,
@@ -35,7 +39,7 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr, tree: sled::Tree
 
 async fn handle_insert(stream: &mut TcpStream, tree: &sled::Tree) -> anyhow::Result<()> {
     let timestamp = stream.read_i32().await?;
-    let price = stream.read_i32().await?;
+    let price = stream.read_i32().await? as i64;
     tree.insert(timestamp.to_be_bytes(), &price.to_be_bytes())?;
     Ok(())
 }
@@ -47,11 +51,16 @@ async fn handle_query(stream: &mut TcpStream, tree: &sled::Tree) -> anyhow::Resu
     let (len, sum) = tree
         .range(start.to_be_bytes()..=end.to_be_bytes())
         .try_fold((0, 0), |(len, sum), res| {
-            res.map(|(_, v)| (len + 1, sum + i32::from_be_bytes([v[0], v[1], v[2], v[3]])))
+            res.map(|(_, v)| {
+                (
+                    len + 1,
+                    sum + i64::from_be_bytes([v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]]),
+                )
+            })
         })?;
-    let avg = ((sum as f64) / (len as f64)).ceil() as i32;
+    let avg = ((sum as f64) / (len as f64)).ceil() as i64;
 
-    stream.write_i32(avg).await?;
+    stream.write_i32(avg as i32).await?;
 
     Ok(())
 }
