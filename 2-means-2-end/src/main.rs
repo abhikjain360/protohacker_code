@@ -1,4 +1,4 @@
-use std::{env, net::SocketAddr};
+use std::{collections::BTreeMap, env, net::SocketAddr};
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use tokio::{
@@ -17,14 +17,11 @@ macro_rules! allow_eof {
     };
 }
 
-async fn handle_stream(
-    mut stream: TcpStream,
-    addr: SocketAddr,
-    tree: sled::Tree,
-) -> anyhow::Result<()> {
+async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Result<()> {
+    let mut tree = BTreeMap::new();
     loop {
         match allow_eof!(stream.read_u8().await) {
-            b'I' => handle_insert(&mut stream, &tree).await?,
+            b'I' => handle_insert(&mut stream, &mut tree).await?,
             b'Q' => handle_query(&mut stream, &tree).await?,
             b => {
                 error!("invalid operation byte: {b}");
@@ -37,27 +34,23 @@ async fn handle_stream(
     Ok(())
 }
 
-async fn handle_insert(stream: &mut TcpStream, tree: &sled::Tree) -> anyhow::Result<()> {
+async fn handle_insert(
+    stream: &mut TcpStream,
+    tree: &mut BTreeMap<i32, i64>,
+) -> anyhow::Result<()> {
     let timestamp = stream.read_i32().await?;
     let price = stream.read_i32().await? as i64;
-    tree.insert(timestamp.to_be_bytes(), &price.to_be_bytes())?;
+    tree.insert(timestamp, price);
     Ok(())
 }
 
-async fn handle_query(stream: &mut TcpStream, tree: &sled::Tree) -> anyhow::Result<()> {
+async fn handle_query(stream: &mut TcpStream, tree: &BTreeMap<i32, i64>) -> anyhow::Result<()> {
     let start = stream.read_i32().await?;
     let end = stream.read_i32().await?;
 
     let (len, sum) = tree
-        .range(start.to_be_bytes()..=end.to_be_bytes())
-        .try_fold((0, 0), |(len, sum), res| {
-            res.map(|(_, v)| {
-                (
-                    len + 1,
-                    sum + i64::from_be_bytes([v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]]),
-                )
-            })
-        })?;
+        .range(start..=end)
+        .fold((0, 0), |(len, sum), (_, &price)| (len + 1, sum + price));
 
     let avg = if len == 0 { 0 } else { sum / len } as i32;
 
@@ -78,15 +71,13 @@ async fn main() -> anyhow::Result<()> {
     let server = TcpListener::bind(addr).await?;
 
     let mut connections = FuturesUnordered::new();
-    let db = sled::open("clients").expect("unable to open db");
 
     loop {
         tokio::select! {
             res = server.accept() => {
                 let (stream, addr) = res?;
                 info!("accepted connection from {addr}");
-                let tree = db.open_tree(addr.to_string().as_bytes())?;
-                connections.push(handle_stream(stream, addr, tree));
+                connections.push(handle_stream(stream, addr));
             }
             opt_res = connections.next() => {
                 if let Some(Err(e)) = opt_res {
