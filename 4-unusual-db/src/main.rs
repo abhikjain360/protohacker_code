@@ -19,6 +19,11 @@ async fn main() -> anyhow::Result<()> {
 
         let key = data.next().expect("there should atleast be an empty slice");
 
+        if key == b"version" {
+            socket.send_to(b"version=Abhik's attempt at Protohack Q4: v1.1", addr).await?;
+            continue;
+        }
+
         match data.next() {
             None => {
                 let value = db.get(key)?.unwrap_or(b"".into());
