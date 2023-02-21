@@ -16,59 +16,26 @@ macro_rules! log_and_exit {
 const UPSTREAM_ADDR: &str = "chat.protohackers.com:16963";
 const TONY_WALLET: &[u8] = b"7YWHMfk9JZe0LM0g1ZauHuiSxhI";
 
-fn is_wallet_addr(segment: &[u8]) -> bool {
-    !segment.is_empty()
-        && segment[0] == b'7'
-        && segment.len() >= 26
-        && segment.len() <= 35
-        && segment.iter().all(u8::is_ascii_alphanumeric)
+fn is_boguscoin(segment: &[u8]) -> bool {
+    segment.len() >= 26 && segment.len() <= 35 && segment[0] == b'7'
 }
 
-fn replace_wallet(msg: Vec<u8>) -> Vec<u8> {
-    if msg.is_empty() {
-        return msg;
-    }
-
-    let Some(start) = msg
-        .iter()
-        .position(|b| !b.is_ascii_whitespace())
-    else { return msg };
-    let end = match msg[start..].iter().position(|b| b.is_ascii_whitespace()) {
-        Some(idx) => idx + start,
-        None => msg.len(),
-    };
-    let segment = &msg[start..end];
-
-    if is_wallet_addr(segment) {
-        let mut new_msg = msg[..start].to_vec();
-        new_msg.extend_from_slice(TONY_WALLET);
-        new_msg.extend_from_slice(&msg[end..]);
-        return new_msg;
-    }
-
-    let Some(position) = msg
-            .iter()
-            .rev()
-            .position(|b| !b.is_ascii_whitespace()) else { return msg };
-    let end = msg.len() - position;
-    let start = match msg[..end]
-        .iter()
-        .rev()
-        .position(|b| b.is_ascii_whitespace())
-    {
-        Some(idx) => msg.len() - idx,
-        None => 0,
-    };
-    let segment = &msg[start..end];
-
-    if is_wallet_addr(segment) {
-        let mut new_msg = msg[..start].to_vec();
-        new_msg.extend_from_slice(TONY_WALLET);
-        new_msg.extend_from_slice(&msg[end..]);
-        return new_msg;
-    }
-
-    msg
+fn replace_wallet(message: &[u8]) -> Vec<u8> {
+    let mut result = message
+        .split(u8::is_ascii_whitespace)
+        .map(|segment| {
+            if is_boguscoin(segment) {
+                return TONY_WALLET;
+            }
+            segment
+        })
+        .fold(vec![], |mut v, segment| {
+            v.extend_from_slice(segment);
+            v.push(b' ');
+            v
+        });
+    result.pop();
+    result
 }
 
 async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Result<()> {
@@ -83,7 +50,7 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
         tokio::select! {
             client_msg_res = client_lines.next_segment() => {
                 let mut msg = match client_msg_res? {
-                    Some(client_msg) => replace_wallet(client_msg),
+                    Some(client_msg) => replace_wallet(&client_msg),
                     None => break,
                 };
                 msg.push(b'\n');
@@ -91,7 +58,7 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
             }
             upstream_msg_res = upstream_lines.next_segment() => {
                 let mut msg = match upstream_msg_res? {
-                    Some(upstream_msg) => replace_wallet(upstream_msg),
+                    Some(upstream_msg) => replace_wallet(&upstream_msg),
                     None => break,
                 };
                 msg.push(b'\n');
