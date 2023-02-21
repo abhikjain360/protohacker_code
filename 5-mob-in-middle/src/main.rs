@@ -22,7 +22,7 @@ fn is_boguscoin(segment: &[u8]) -> bool {
 
 fn replace_wallet(message: &[u8]) -> Vec<u8> {
     let mut result = message
-        .split(u8::is_ascii_whitespace)
+        .split(|b| *b == b' ')
         .map(|segment| {
             if is_boguscoin(segment) {
                 return TONY_WALLET;
@@ -30,7 +30,7 @@ fn replace_wallet(message: &[u8]) -> Vec<u8> {
             segment
         })
         .fold(vec![], |mut v, segment| {
-            v.extend_from_slice(segment);
+            v.extend(segment);
             v.push(b' ');
             v
         });
@@ -44,17 +44,18 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
     let mut upstream_lines = BufReader::new(upstream_reader).split(b'\n');
 
     let (client_reader, mut client_writer) = stream.split();
-    let mut client_lines = BufReader::new(client_reader).split(b'\n');
+    let client_buf = &mut Vec::new();
+    let mut client_lines = BufReader::new(client_reader);
 
     loop {
         tokio::select! {
-            client_msg_res = client_lines.next_segment() => {
-                let mut msg = match client_msg_res? {
-                    Some(client_msg) => replace_wallet(&client_msg),
-                    None => break,
-                };
-                msg.push(b'\n');
-                upstream_writer.write_all(&msg).await?;
+            res = client_lines.read_until(b'\n', client_buf) => {
+                let n = res?;
+                if n == 0 {
+                    break;
+                }
+                upstream_writer.write_all(&replace_wallet(&client_buf[..n])).await?;
+                client_buf.clear();
             }
             upstream_msg_res = upstream_lines.next_segment() => {
                 let mut msg = match upstream_msg_res? {
