@@ -28,14 +28,14 @@ fn replace_wallet(message: &[u8]) -> Vec<u8> {
     let mut i = 0;
 
     while i < message.len() {
-        let Some(pos) = message[i..].iter().position(|b| !b.is_ascii_whitespace()) else {
+        let Some(pos) = message[i..].iter().position(|b| *b != b' ') else {
             res.extend_from_slice(&message[i..]);
             break;
         };
         let start = i + pos;
         res.extend_from_slice(&message[i..start]);
 
-        let end = match message[start..].iter().position(u8::is_ascii_whitespace) {
+        let end = match message[start..].iter().position(|b| *b == b' ') {
             Some(pos) => start + pos,
             None => message.len(),
         };
