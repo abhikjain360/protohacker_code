@@ -1,0 +1,8 @@
+   Compiling mob-in-middle v0.1.0 (/home/kaka/coding/protohacker/protohacker_code/5-mob-in-middle)
+    Finished release [optimized] target(s) in 1.57s
+     Running `target/release/mob-in-middle '0.0.0.0:3000'`
+[2m2023-02-22T08:31:33.122185Z[0m [32m INFO[0m [2mmob_in_middle[0m[2m:[0m accepted connection from 127.0.0.1:54750
+[2m2023-02-22T08:31:33.240337Z[0m [34mDEBUG[0m [2mmob_in_middle[0m[2m:[0m segment = Welcome [3mstart[0m[2m=[0m0 [3mend[0m[2m=[0m7 [3mml[0m[2m=[0m46
+[2m2023-02-22T08:31:34.240527Z[0m [34mDEBUG[0m [2mmob_in_middle[0m[2m:[0m segment = to [3mstart[0m[2m=[0m8 [3mend[0m[2m=[0m10 [3mml[0m[2m=[0m46
+[2m2023-02-22T08:31:35.240701Z[0m [34mDEBUG[0m [2mmob_in_middle[0m[2m:[0m segment = budgetchat! [3mstart[0m[2m=[0m11 [3mend[0m[2m=[0m22 [3mml[0m[2m=[0m46
+[2m2023-02-22T08:31:36.241102Z[0m [34mDEBUG[0m [2mmob_in_middle[0m[2m:[0m segment = What [3mstart[0m[2m=[0m23 [3mend[0m[2m=[0m27 [3mml[0m[2m=[0m46
