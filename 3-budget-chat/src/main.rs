@@ -9,6 +9,8 @@ use tokio::{
 };
 use tracing::{error, info};
 
+use util::{log_and_exit, write_and_exit};
+
 pub type UserName = Arc<String>;
 pub type MsgConent = Arc<String>;
 pub type UsersList = Arc<RwLock<HashSet<Arc<String>>>>;
@@ -16,20 +18,6 @@ pub type UsersList = Arc<RwLock<HashSet<Arc<String>>>>;
 const WELCOME_MESSAGE: &[u8] = b"* Welcome to budgetchat! What shall I call you?\n";
 const LONG_NAME_ERR_MESSAGE: &[u8] = b"* name is to long, atmost 16 characters allowed\n";
 const DUPLICATE_NAME_ERR_MESSAGE: &[u8] = b"* this name is already in use\n";
-
-macro_rules! log_and_exit {
-    ($addr:ident) => {
-        info!("closing connection with {}", $addr);
-        return Ok(());
-    };
-}
-
-macro_rules! write_and_exit {
-    ($writer:ident, $msg:ident, $addr:ident) => {
-        $writer.write_all($msg).await?;
-        log_and_exit!($addr);
-    };
-}
 
 #[derive(Debug, Clone)]
 pub struct Msg {

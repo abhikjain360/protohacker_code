@@ -1,0 +1,23 @@
+[workspace]
+members = [
+	"util",
+	"0-smoke-test",
+	"1-prime-time",
+	"2-means-2-end",
+	"3-budget-chat",
+	"4-unusual-db",
+	"5-mob-in-middle",
+	"6-speed-daemon",
+]
+
+[workspace.dependencies]
+ahash = "0.8.3"
+anyhow = { version = "1.0.69", features = ["backtrace"] }
+futures = "0.3.26"
+indexmap = { version = "1.9.2", features = ["std"] }
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = { version = "1.0.93", features = ["alloc", "indexmap"] }
+tap = "1.0.1"
+tokio = { version = "1.25.0", features = ["io-util", "macros", "net", "parking_lot", "rt-multi-thread", "sync", "time"] }
+tracing = { version = "0.1.37", features = ["async-await", "log"] }
+tracing-subscriber = { version = "0.3.16", features = ["env-filter", "once_cell", "parking_lot", "time"] }

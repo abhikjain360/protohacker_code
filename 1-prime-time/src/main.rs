@@ -65,8 +65,7 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
         writer.write_all(output_str.as_bytes()).await?;
     }
 
-    info!("closing connection with {addr}");
-    Ok(())
+    util::log_and_exit!(addr);
 }
 
 #[tokio::main]

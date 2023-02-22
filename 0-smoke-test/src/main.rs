@@ -1,4 +1,4 @@
-use std::{env, io, net::SocketAddr};
+use std::{io, net::SocketAddr};
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use tokio::{
@@ -49,13 +49,9 @@ impl StreamHandler {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().init();
+    util::init_tracing();
 
-    let mut args = env::args();
-    args.next().expect("no binary name");
-
-    let addr: SocketAddr = args.next().expect("no bind addr provided").parse()?;
-
+    let addr = util::addr_from_args()?;
     let listener = TcpListener::bind(addr).await?;
 
     let read_futures = &mut FuturesUnordered::new();
