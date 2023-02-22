@@ -4,7 +4,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
 };
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 macro_rules! log_and_exit {
     ($addr:ident) => {
@@ -60,6 +60,11 @@ fn replace_wallet(message: &[u8]) -> Vec<u8> {
     res
 }
 
+#[allow(dead_code)]
+fn parse_slice(slice: &[u8]) -> &str {
+    std::str::from_utf8(slice).unwrap()
+}
+
 async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Result<()> {
     let mut upstream = TcpStream::connect(UPSTREAM_ADDR).await?;
     let (upstream_reader, mut upstream_writer) = upstream.split();
@@ -77,6 +82,7 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
                 if n == 0 {
                     break;
                 }
+                debug!(client_msg = parse_slice(&client_buf[..n]));
                 upstream_writer.write_all(&replace_wallet(&client_buf[..n])).await?;
                 client_buf.clear();
             }
@@ -85,6 +91,7 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
                 if n == 0 {
                     break;
                 }
+                debug!(upstream_msg = parse_slice(&upstream_buf[..n]));
                 client_writer.write_all(&replace_wallet(&upstream_buf[..n])).await?;
                 upstream_buf.clear();
             }
