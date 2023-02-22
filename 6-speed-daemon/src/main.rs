@@ -162,28 +162,33 @@ impl DispatchersMap {
 
 type DispatchersId = u16;
 
-struct Heartbeat(Option<time::Instant>);
+struct HeartbeatTimer {
+    next: time::Instant,
+    interval: Duration,
+}
+struct Heartbeat(Option<HeartbeatTimer>);
 
 impl Heartbeat {
     fn from_interval(interval: u64) -> Self {
         if interval != 0 {
-            Self(Some(
-                time::Instant::now() + Duration::from_millis(interval as u64 * 100),
-            ))
+            let interval = Duration::from_millis(interval as u64 * 100);
+            Self(Some(HeartbeatTimer {
+                next: time::Instant::now() + interval,
+                interval,
+            }))
         } else {
             Self(None)
         }
     }
 
-    async fn wait(&self) {
-        match &self.0 {
-            Some(instant) => time::sleep_until(*instant).await,
+    async fn wait(&mut self) {
+        match &mut self.0 {
+            Some(timer) => {
+                time::sleep_until(timer.next).await;
+                timer.next = time::Instant::now() + timer.interval;
+            },
             None => future::pending().await,
         }
-    }
-
-    fn take(&mut self) {
-        self.0.take();
     }
 }
 
@@ -218,7 +223,6 @@ async fn handle_stream(mut stream: TcpStream, state: State) -> anyhow::Result<()
             },
             _ = heartbeat.wait() => {
                 stream.write_u8(HEARTBEAT).await?;
-                heartbeat.take();
             }
         }
     }
@@ -263,7 +267,6 @@ async fn camera(
             },
             _ = heartbeat.wait() => {
                 stream.write_u8(HEARTBEAT).await?;
-                heartbeat.take();
             }
         }
     }
@@ -397,7 +400,6 @@ async fn dispatcher(
 
             _ = heartbeat.wait() => {
                 stream.write_u8(HEARTBEAT).await?;
-                heartbeat.take();
             }
         }
     }
