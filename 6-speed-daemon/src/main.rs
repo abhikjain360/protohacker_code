@@ -194,7 +194,7 @@ async fn handle_stream(mut stream: TcpStream, state: State) -> anyhow::Result<()
         tokio::select! {
             msg_type_res = stream.read_u8() => {
                 match msg_type_res? {
-                    HEARTBEAT => {
+                    WANT_HEARTBEAT => {
                         let interval = stream.read_u32().await?;
                         heartbeat = Heartbeat(Some(time::Instant::now() + Duration::from_millis(interval as u64 * 100)));
                         continue;
@@ -207,7 +207,7 @@ async fn handle_stream(mut stream: TcpStream, state: State) -> anyhow::Result<()
                 }
             },
             _ = heartbeat.wait() => {
-                stream.write_u8(WANT_HEARTBEAT).await?;
+                stream.write_u8(HEARTBEAT).await?;
                 heartbeat.take();
             }
         }
@@ -230,7 +230,7 @@ async fn camera(
         tokio::select! {
             msg_type_res = stream.read_u8() => {
                 match msg_type_res? {
-                    HEARTBEAT => {
+                    WANT_HEARTBEAT => {
                         let interval = stream.read_u32().await?;
                         heartbeat = Heartbeat(Some(time::Instant::now() + Duration::from_millis(interval as u64 * 100)));
                         continue;
@@ -252,7 +252,7 @@ async fn camera(
                 }
             },
             _ = heartbeat.wait() => {
-                stream.write_u8(WANT_HEARTBEAT).await?;
+                stream.write_u8(HEARTBEAT).await?;
                 heartbeat.take();
             }
         }
@@ -368,7 +368,7 @@ async fn dispatcher(
         tokio::select! {
             msg_type_res = stream.read_u8() => {
                 match msg_type_res? {
-                    HEARTBEAT => {
+                    WANT_HEARTBEAT => {
                         let interval = stream.read_u32().await?;
                         heartbeat = Heartbeat(Some(time::Instant::now() + Duration::from_millis(interval as u64 * 100)));
                         continue;
@@ -386,7 +386,7 @@ async fn dispatcher(
             }
 
             _ = heartbeat.wait() => {
-                stream.write_u8(WANT_HEARTBEAT).await?;
+                stream.write_u8(HEARTBEAT).await?;
                 heartbeat.take();
             }
         }
