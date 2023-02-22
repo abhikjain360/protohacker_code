@@ -165,6 +165,16 @@ type DispatchersId = u16;
 struct Heartbeat(Option<time::Instant>);
 
 impl Heartbeat {
+    fn from_interval(interval: u64) -> Self {
+        if interval != 0 {
+            Self(Some(
+                time::Instant::now() + Duration::from_millis(interval as u64 * 100),
+            ))
+        } else {
+            Self(None)
+        }
+    }
+
     async fn wait(&self) {
         match &self.0 {
             Some(instant) => time::sleep_until(*instant).await,
@@ -196,7 +206,7 @@ async fn handle_stream(mut stream: TcpStream, state: State) -> anyhow::Result<()
                 match msg_type_res? {
                     WANT_HEARTBEAT => {
                         let interval = stream.read_u32().await?;
-                        heartbeat = Heartbeat(Some(time::Instant::now() + Duration::from_millis(interval as u64 * 100)));
+                        heartbeat = Heartbeat::from_interval(interval as u64);
                         continue;
                     }
 
@@ -232,7 +242,7 @@ async fn camera(
                 match msg_type_res? {
                     WANT_HEARTBEAT => {
                         let interval = stream.read_u32().await?;
-                        heartbeat = Heartbeat(Some(time::Instant::now() + Duration::from_millis(interval as u64 * 100)));
+                        heartbeat = Heartbeat::from_interval(interval as u64);
                         continue;
                     }
 
@@ -370,7 +380,7 @@ async fn dispatcher(
                 match msg_type_res? {
                     WANT_HEARTBEAT => {
                         let interval = stream.read_u32().await?;
-                        heartbeat = Heartbeat(Some(time::Instant::now() + Duration::from_millis(interval as u64 * 100)));
+                        heartbeat = Heartbeat::from_interval(interval as u64);
                         continue;
                     }
 
