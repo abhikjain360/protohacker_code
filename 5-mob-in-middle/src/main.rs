@@ -1,17 +1,7 @@
-use std::{env, net::SocketAddr};
-
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    net::{TcpListener, TcpStream},
+    net::TcpStream,
 };
-use tracing::{error, info};
-
-macro_rules! log_and_exit {
-    ($addr:ident) => {
-        info!("closing connection with {}", $addr);
-        return Ok(());
-    };
-}
 
 const UPSTREAM_ADDR: &str = "chat.protohackers.com:16963";
 const TONY_WALLET: &[u8] = b"7YWHMfk9JZe0LM0g1ZauHuiSxhI";
@@ -55,12 +45,7 @@ fn replace_wallet(message: &[u8]) -> Vec<u8> {
     res
 }
 
-#[allow(dead_code)]
-fn parse_slice(slice: &[u8]) -> &str {
-    std::str::from_utf8(slice).unwrap()
-}
-
-async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Result<()> {
+async fn handle_stream(mut stream: TcpStream, _: ()) -> anyhow::Result<()> {
     let mut upstream = TcpStream::connect(UPSTREAM_ADDR).await?;
     let (upstream_reader, mut upstream_writer) = upstream.split();
     let upstream_buf = &mut Vec::new();
@@ -97,33 +82,10 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
         }
     }
 
-    log_and_exit!(addr);
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
-    let mut args = env::args();
-    args.next().expect("no binary name");
-
-    let addr: SocketAddr = args.next().expect("no addr").parse()?;
-
-    let server = TcpListener::bind(addr).await?;
-
-    loop {
-        let (stream, addr) = server.accept().await?;
-        info!("accepted connection from {addr}");
-
-        tokio::spawn(async move {
-            if let Err(e) = handle_stream(stream, addr).await {
-                error!("{e}");
-            }
-        });
-    }
-
-    #[allow(unreachable_code)]
-    Ok(())
+    util::accept_loop_with_env(handle_stream, ()).await
 }
