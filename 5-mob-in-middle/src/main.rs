@@ -4,7 +4,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
 };
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 macro_rules! log_and_exit {
     ($addr:ident) => {
@@ -73,6 +73,7 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
 
     let (client_reader, mut client_writer) = stream.split();
     let client_buf = &mut Vec::new();
+    let client_msg_buf = &mut Vec::new();
     let mut client_lines = BufReader::new(client_reader);
 
     loop {
@@ -82,17 +83,20 @@ async fn handle_stream(mut stream: TcpStream, addr: SocketAddr) -> anyhow::Resul
                 if n == 0 {
                     break;
                 }
-                debug!(client_msg = parse_slice(&client_buf[..n]));
-                upstream_writer.write_all(&replace_wallet(&client_buf[..n])).await?;
+                client_msg_buf.extend_from_slice(&client_buf);
                 client_buf.clear();
+                if *client_msg_buf.last().unwrap() != b'\n' {
+                    continue;
+                }
+                upstream_writer.write_all(&replace_wallet(&client_msg_buf)).await?;
+                client_msg_buf.clear();
             }
             res = upstream_lines.read_until(b'\n', upstream_buf) => {
                 let n = res?;
                 if n == 0 {
                     break;
                 }
-                debug!(upstream_msg = parse_slice(&upstream_buf[..n]));
-                client_writer.write_all(&replace_wallet(&upstream_buf[..n])).await?;
+                client_writer.write_all(&replace_wallet(&upstream_buf)).await?;
                 upstream_buf.clear();
             }
         }
