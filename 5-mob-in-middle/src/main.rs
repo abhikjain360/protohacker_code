@@ -42,12 +42,7 @@ fn replace_wallet(message: &[u8]) -> Vec<u8> {
 
         let segment = &message[start..end];
 
-        if !res.is_empty()
-            && *res.last().unwrap() == b' '
-            && end < message.len()
-            && message[end] == b' '
-            && is_wallet_addr(segment)
-        {
+        if is_wallet_addr(segment) {
             res.extend_from_slice(TONY_WALLET);
         } else {
             res.extend_from_slice(segment);
