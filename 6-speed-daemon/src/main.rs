@@ -292,10 +292,11 @@ async fn handle_plate(
     let car = lock.entry(plate.clone()).or_default();
     let timestamps = car.roads.entry(road).or_default();
     let day = timestamp / 86400;
-    let mut ticket_recved = !car.tickets.contains(&day);
+
+    let mut ticket_recved = car.tickets.contains(&day);
 
     debug!(
-        "plate {} recorded at {timestamp} on road {road} mile {mile} day {day}",
+        "plate {} recorded at {timestamp} on road {road} mile {mile} day {day} ticket_recved {ticket_recved}",
         util::slice_to_str(&plate)
     );
 
