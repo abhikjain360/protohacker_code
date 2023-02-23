@@ -8,7 +8,7 @@ use tokio::{
     sync::{mpsc, Mutex, RwLock},
     time,
 };
-use tracing::{debug, error, info};
+use tracing::error;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -158,7 +158,6 @@ impl DispatchersMap {
             if let Some(tx) = self.dispatchers.get(dispatcher_id) {
                 return tx.send(ticket).await;
             }
-            error!("{dispatcher_id} dispatcher in roads_map but does not exist");
         }
 
         self.pending_tickets.entry(road).or_default().push(ticket);
@@ -176,8 +175,6 @@ struct Heartbeat(Option<HeartbeatTimer>);
 
 impl Heartbeat {
     fn from_interval(interval: u64) -> Self {
-        info!("heartbeat requested at interval {interval}");
-
         if interval != 0 {
             let interval = Duration::from_millis(interval as u64 * 100);
             Self(Some(HeartbeatTimer {
@@ -227,7 +224,7 @@ async fn handle_stream(mut stream: TcpStream, state: State) -> anyhow::Result<()
                     I_AM_CAMERA => return camera(stream, state, heartbeat).await,
                     I_AM_DISPATCHER => return dispatcher(stream, state, heartbeat).await,
 
-                    msg_type => return Err(anyhow!("invalid msg type: {msg_type}")),
+                    msg_type => return send_error(&mut stream, msg_type).await,
                 }
             },
             _ = heartbeat.wait() => {
@@ -248,8 +245,6 @@ async fn camera(
     let road = stream.read_u16().await?;
     let mile = stream.read_u16().await?;
     let limit = stream.read_u16().await? as f64;
-
-    info!("camera at road {road} mile {mile} limit {limit}");
 
     loop {
         tokio::select! {
@@ -302,15 +297,8 @@ async fn handle_plate(
     let timestamps = car.roads.entry(road).or_default();
     let day = timestamp / SECS_IN_A_DAY;
 
-    debug!(
-        "plate {} recorded at {timestamp} on road {road} mile {mile} day {day}",
-        util::slice_to_str(&plate)
-    );
-
     if let Some((previous_timestamp, previous_mile)) = timestamps.range(..timestamp).next_back() {
         let previous_day = *previous_timestamp / SECS_IN_A_DAY;
-
-        debug!("previous: timestamp {previous_timestamp} mile {previous_mile} day {previous_day}");
 
         if !car.tickets.contains(&day)
             && !car.tickets.contains(&previous_day)
@@ -326,7 +314,6 @@ async fn handle_plate(
             )
             .await?
         {
-            debug!("sending ticket");
             car.tickets.insert(day);
             car.tickets.insert(previous_day);
         }
@@ -334,8 +321,6 @@ async fn handle_plate(
 
     if let Some((next_timestamp, next_mile)) = timestamps.range(timestamp..).next() {
         let next_day = *next_timestamp / SECS_IN_A_DAY;
-
-        debug!("next: timestamp {next_timestamp} mile {next_mile} day {next_day}");
 
         if !car.tickets.contains(&day)
             && !car.tickets.contains(&next_day)
@@ -351,7 +336,6 @@ async fn handle_plate(
             )
             .await?
         {
-            debug!("sending ticket");
             car.tickets.insert(day);
             car.tickets.insert(next_day);
         }
@@ -375,7 +359,6 @@ async fn check_speed(
     let time = (timestamp1 as f64 - timestamp2 as f64) / 3600.0;
     let distance = mile1 as f64 - mile2 as f64;
     let speed = (distance / time).abs();
-    debug!("speed_check: distance = {distance} time = {time} speed = {speed}");
     if speed - limit >= 0.5 {
         state
             .dispatchers
@@ -399,8 +382,6 @@ async fn dispatcher(
         roads.push(stream.read_u16().await?);
     }
 
-    info!("dispatcher for roads {roads:?}");
-
     let DispatcherInsert {
         pending_tickets,
         mut rx,
@@ -420,7 +401,7 @@ async fn dispatcher(
                         continue;
                     }
 
-                    msg_type => return Err(anyhow!("invalid msg type: {msg_type}")),
+                    msg_type => return send_error(&mut stream, msg_type).await,
                 }
             },
 
@@ -428,7 +409,6 @@ async fn dispatcher(
                 let Some(ticket) = msg_opt else {
                     break;
                 };
-                debug!("recved ticket for plate {}", util::slice_to_str(&ticket.plate));
                 stream.write_vectored(ticket_io_slices!(ticket)).await?;
             }
 

@@ -16,7 +16,7 @@ macro_rules! log_and_exit {
 macro_rules! write_and_exit {
     ($writer:ident, $msg:ident, $addr:ident) => {
         tokio::io::AsyncWriteExt::write_all(&mut $writer, $msg).await?;
-        log_and_exit!($addr);
+        util::log_and_exit!($addr);
     };
 }
 
