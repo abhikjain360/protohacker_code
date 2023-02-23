@@ -8,7 +8,7 @@ use tokio::{
     sync::{mpsc, Mutex, RwLock},
     time,
 };
-use tracing::error;
+use tracing::{debug, error, info};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -170,6 +170,8 @@ struct Heartbeat(Option<HeartbeatTimer>);
 
 impl Heartbeat {
     fn from_interval(interval: u64) -> Self {
+        info!("heartbeat requested at interval {interval}");
+
         if interval != 0 {
             let interval = Duration::from_millis(interval as u64 * 100);
             Self(Some(HeartbeatTimer {
@@ -186,7 +188,7 @@ impl Heartbeat {
             Some(timer) => {
                 time::sleep_until(timer.next).await;
                 timer.next = time::Instant::now() + timer.interval;
-            },
+            }
             None => future::pending().await,
         }
     }
@@ -240,6 +242,8 @@ async fn camera(
     let mile = stream.read_u16().await?;
     let limit = stream.read_u16().await? as f64;
 
+    info!("camera at road {road} mile {mile} limit {limit}");
+
     loop {
         tokio::select! {
             msg_type_res = stream.read_u8() => {
@@ -283,6 +287,11 @@ async fn handle_plate(
     limit: f64,
     state: State,
 ) -> anyhow::Result<()> {
+    debug!(
+        "plate {} recorded at {timestamp} on road {road} mile {mile}",
+        util::slice_to_str(&plate)
+    );
+
     let mut lock = state.cars.lock().await;
 
     let car = lock.entry(plate.clone()).or_default();
@@ -291,6 +300,7 @@ async fn handle_plate(
     let mut ticket_recved = !car.tickets.contains(&day);
 
     if let Some((previous_timestamp, previous_mile)) = timestamps.range(..timestamp).next_back() {
+        debug!("previous timestamp {previous_timestamp} previous_mile {previous_mile}");
         if !ticket_recved
             && check_speed(
                 plate.clone(),
@@ -304,17 +314,19 @@ async fn handle_plate(
             )
             .await?
         {
+            debug!("sending ticket");
             car.tickets.insert(day);
             ticket_recved = true;
         }
     }
 
-    if let Some((previous_timestamp, previous_mile)) = timestamps.range(timestamp..).next() {
+    if let Some((next_timestamp, next_mile)) = timestamps.range(timestamp..).next() {
+        debug!("next timestamp {next_timestamp} next_mile {next_mile}");
         if !ticket_recved
             && check_speed(
                 plate,
-                *previous_timestamp,
-                *previous_mile,
+                *next_timestamp,
+                *next_mile,
                 timestamp,
                 mile,
                 road,
@@ -323,6 +335,7 @@ async fn handle_plate(
             )
             .await?
         {
+            debug!("sending ticket");
             car.tickets.insert(day);
         }
     }
@@ -368,6 +381,8 @@ async fn dispatcher(
         roads.push(stream.read_u16().await?);
     }
 
+    info!("dispatcher for roads {roads:?}");
+
     let DispatcherInsert {
         pending_tickets,
         mut rx,
@@ -395,6 +410,7 @@ async fn dispatcher(
                 let Some(ticket) = msg_opt else {
                     break;
                 };
+                debug!("recved ticket for plate {}", util::slice_to_str(&ticket.plate));
                 stream.write_vectored(ticket_io_slices!(ticket)).await?;
             }
 
