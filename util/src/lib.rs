@@ -68,3 +68,7 @@ where
     init_tracing();
     accept_loop(f, addr_from_args()?, state).await
 }
+
+pub fn slice_to_str(slice: &[u8]) -> &str {
+    std::str::from_utf8(slice).unwrap()
+}
