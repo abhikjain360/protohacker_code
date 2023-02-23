@@ -286,6 +286,8 @@ async fn camera(
     Ok(())
 }
 
+const SECS_IN_A_DAY: u32 = 86400;
+
 async fn handle_plate(
     plate: Plate,
     timestamp: u32,
@@ -298,7 +300,7 @@ async fn handle_plate(
 
     let car = lock.entry(plate.clone()).or_default();
     let timestamps = car.roads.entry(road).or_default();
-    let day = timestamp / 86400;
+    let day = timestamp / SECS_IN_A_DAY;
 
     let mut ticket_recved = car.tickets.contains(&day);
 
@@ -324,6 +326,7 @@ async fn handle_plate(
         {
             debug!("sending ticket");
             car.tickets.insert(day);
+            car.tickets.insert(*previous_timestamp / SECS_IN_A_DAY);
             ticket_recved = true;
         }
     }
@@ -345,6 +348,7 @@ async fn handle_plate(
         {
             debug!("sending ticket");
             car.tickets.insert(day);
+            car.tickets.insert(*next_timestamp / SECS_IN_A_DAY);
         }
     }
 
