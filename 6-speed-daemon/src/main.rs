@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io::IoSlice, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, io::IoSlice, sync::Arc, time::Duration, mem};
 
 use anyhow::anyhow;
 use futures::future;
@@ -56,12 +56,17 @@ impl Ticket {
     fn new(
         plate: Arc<Vec<u8>>,
         road: u16,
-        mile1: u16,
-        timestamp1: u32,
-        mile2: u16,
-        timestamp2: u32,
+        mut mile1: u16,
+        mut timestamp1: u32,
+        mut mile2: u16,
+        mut timestamp2: u32,
         speed: f64,
     ) -> Self {
+        if timestamp2 < timestamp1 {
+            mem::swap(&mut timestamp1, &mut timestamp2);
+            mem::swap(&mut mile1, &mut mile2);
+        }
+
         Self {
             plate,
             road,
