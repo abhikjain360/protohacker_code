@@ -77,6 +77,7 @@ impl Ticket {
 macro_rules! ticket_io_slices {
     ($ticket:ident) => {
         &[
+            IoSlice::new(&[TICKET]),
             IoSlice::new(&[$ticket.plate.len() as u8]),
             IoSlice::new(&$ticket.plate),
             IoSlice::new(&$ticket.road.to_be_bytes()),
@@ -197,6 +198,7 @@ impl Heartbeat {
 const ERROR: u8 = 0x10;
 
 const PLATE: u8 = 0x20;
+const TICKET: u8 = 0x21;
 
 const WANT_HEARTBEAT: u8 = 0x40;
 const HEARTBEAT: u8 = 0x41;
