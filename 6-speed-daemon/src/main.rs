@@ -358,7 +358,7 @@ async fn check_speed(
 ) -> anyhow::Result<bool> {
     let time = (timestamp1 as f64 - timestamp2 as f64) / 3600.0;
     let distance = mile1 as f64 - mile2 as f64;
-    let speed = (time / distance).abs();
+    let speed = (distance / time).abs();
     debug!("speed_check: distance = {distance} time = {time} speed = {speed}");
     if speed - limit >= 0.5 {
         state
