@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io::IoSlice, sync::Arc, time::Duration, mem};
+use std::{collections::BTreeMap, io::IoSlice, mem, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use futures::future;
@@ -302,16 +302,18 @@ async fn handle_plate(
     let timestamps = car.roads.entry(road).or_default();
     let day = timestamp / SECS_IN_A_DAY;
 
-    let mut ticket_recved = car.tickets.contains(&day);
-
     debug!(
-        "plate {} recorded at {timestamp} on road {road} mile {mile} day {day} ticket_recved {ticket_recved}",
+        "plate {} recorded at {timestamp} on road {road} mile {mile} day {day}",
         util::slice_to_str(&plate)
     );
 
     if let Some((previous_timestamp, previous_mile)) = timestamps.range(..timestamp).next_back() {
-        debug!("previous timestamp {previous_timestamp} previous_mile {previous_mile}");
-        if !ticket_recved
+        let previous_day = *previous_timestamp / SECS_IN_A_DAY;
+
+        debug!("previous: timestamp {previous_timestamp} mile {previous_mile} day {previous_day}");
+
+        if !car.tickets.contains(&day)
+            && !car.tickets.contains(&previous_day)
             && check_speed(
                 plate.clone(),
                 *previous_timestamp,
@@ -326,14 +328,17 @@ async fn handle_plate(
         {
             debug!("sending ticket");
             car.tickets.insert(day);
-            car.tickets.insert(*previous_timestamp / SECS_IN_A_DAY);
-            ticket_recved = true;
+            car.tickets.insert(previous_day);
         }
     }
 
     if let Some((next_timestamp, next_mile)) = timestamps.range(timestamp..).next() {
-        debug!("next timestamp {next_timestamp} next_mile {next_mile}");
-        if !ticket_recved
+        let next_day = *next_timestamp / SECS_IN_A_DAY;
+
+        debug!("next: timestamp {next_timestamp} mile {next_mile} day {next_day}");
+
+        if !car.tickets.contains(&day)
+            && !car.tickets.contains(&next_day)
             && check_speed(
                 plate,
                 *next_timestamp,
@@ -348,7 +353,7 @@ async fn handle_plate(
         {
             debug!("sending ticket");
             car.tickets.insert(day);
-            car.tickets.insert(*next_timestamp / SECS_IN_A_DAY);
+            car.tickets.insert(next_day);
         }
     }
 
