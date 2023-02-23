@@ -287,17 +287,17 @@ async fn handle_plate(
     limit: f64,
     state: State,
 ) -> anyhow::Result<()> {
-    debug!(
-        "plate {} recorded at {timestamp} on road {road} mile {mile}",
-        util::slice_to_str(&plate)
-    );
-
     let mut lock = state.cars.lock().await;
 
     let car = lock.entry(plate.clone()).or_default();
     let timestamps = car.roads.entry(road).or_default();
     let day = timestamp / 86400;
     let mut ticket_recved = !car.tickets.contains(&day);
+
+    debug!(
+        "plate {} recorded at {timestamp} on road {road} mile {mile} day {day}",
+        util::slice_to_str(&plate)
+    );
 
     if let Some((previous_timestamp, previous_mile)) = timestamps.range(..timestamp).next_back() {
         debug!("previous timestamp {previous_timestamp} previous_mile {previous_mile}");
